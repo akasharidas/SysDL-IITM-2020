@@ -73,4 +73,4 @@ class Net(nn.Module):
         x = self.avg_pool(self.conv2(x))
         x = self.classifier(x)
 
-        return x.view(-1, 1)
+        return torch.squeeze(x)

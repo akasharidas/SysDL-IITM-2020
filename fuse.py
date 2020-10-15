@@ -28,14 +28,14 @@ if __name__ == "__main__":
         root="/data", train=True, download=True, transform=transform_train
     )
     trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=4, shuffle=True, num_workers=2
+        trainset, batch_size=64, shuffle=True, num_workers=4
     )
 
     testset = torchvision.datasets.CIFAR100(
         root="/data", train=False, download=True, transform=transform_test
     )
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=4, shuffle=False, num_workers=2
+        testset, batch_size=64, shuffle=False, num_workers=4
     )
 
     net = Net()
@@ -65,20 +65,21 @@ if __name__ == "__main__":
             pbar.update()
         pbar.close()
 
-    pbar = tqdm(desc="Testing", total=len(testloader))
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            outputs = net(images)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-            pbar.update()
+        pbar = tqdm(desc="Testing", total=len(testloader))
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for data in testloader:
+                images, labels = data
+                images, labels = images.to(device), labels.to(device)
+                outputs = net(images)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                pbar.update()
 
-    print(
-        "Accuracy of the network on the 10000 test images: %d %%"
-        % (100 * correct / total)
-    )
-    pbar.close()
+        print(
+            "Accuracy of the network on the 10000 test images: %d %%"
+            % (100 * correct / total)
+        )
+        pbar.close()

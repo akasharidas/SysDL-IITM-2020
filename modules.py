@@ -94,7 +94,7 @@ class Fuse(nn.Module):
         x = torch.cat([out1, out2], 1)
 
         if self.is_SE:
-            x = Hsigmoid(self.SE(x))
+            x = self.SE(x)
 
         x = self.NL(x)
 
