@@ -77,7 +77,7 @@ class Fuse(nn.Module):
 
         self.SE = None
         if is_SE:
-            self.SE = nn.Sequential(SEModule(2 * exp), Hsigmoid())
+            self.SE = SEModule(2 * exp)
 
         self.conv2 = nn.Sequential(
             nn.Conv2d(2 * exp, oup, kernel_size=1, bias=False), nn.BatchNorm2d(oup)
