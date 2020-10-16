@@ -76,12 +76,11 @@ if __name__ == "__main__":
         )
 
     print("Starting training...\n")
+    num_examples = 0
 
     wandb.watch(net)
 
     for epoch in range(config["epochs"]):
-        wandb.log({"epoch": epoch}, commit=False)
-
         start_time = time.time()
         pbar = tqdm(desc="Training epoch: {}".format(epoch), total=len(trainloader))
         correct = 0
@@ -99,11 +98,12 @@ if __name__ == "__main__":
             if config["schedule"]:
                 scheduler.step()
 
+            num_examples += labels.shape[0]
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-            wandb.log({"train_loss": loss.item()})
+            wandb.log({"train_loss": loss.item(), "examples_seen": num_examples})
             pbar.update()
 
         train_accuracy = 100 * correct / total
@@ -134,6 +134,7 @@ if __name__ == "__main__":
 
         wandb.log(
             {
+                "epoch": epoch,
                 "train_acc": train_accuracy,
                 "test_loss": test_loss,
                 "test_acc": test_accuracy,
