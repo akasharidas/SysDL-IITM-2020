@@ -2,12 +2,27 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from tqdm import tqdm
+import wandb
+import time
+import os
 
 from SysDLNet import Net
 
 if __name__ == "__main__":
+    wandb.login(key="df416cf0e6b9361efc64aa08d4715af979c8d070")
+    config = dict(
+        epochs=5,
+        batch_size=64,
+        optimizer="adam",
+        lr=0.005,
+        momentum=None,
+        weight_decay=0,
+        schedule=False,
+    )
+
+    wandb.init(config=config, project="SysDL Assignment 3")
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    EPOCHS = 5
 
     transform_train = transforms.Compose(
         [
@@ -28,30 +43,50 @@ if __name__ == "__main__":
         root="/data", train=True, download=True, transform=transform_train
     )
     trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=64, shuffle=True, num_workers=4
+        trainset, batch_size=config["batch_size"], shuffle=True, num_workers=4
     )
 
     testset = torchvision.datasets.CIFAR100(
         root="/data", train=False, download=True, transform=transform_test
     )
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=64, shuffle=False, num_workers=4
+        testset, batch_size=config["batch_size"], shuffle=False, num_workers=4
     )
 
     net = Net()
     net.to(device)
 
     loss_fn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(net.parameters())
+
+    if config["optimizer"] == "adam":
+        optimizer = torch.optim.Adam(
+            net.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
+        )
+    elif config["optimizer"] == "sgd":
+        optimizer = torch.optim.SGD(
+            net.parameters(),
+            lr=config["lr"],
+            weight_decay=config["weight_decay"],
+            momentum=config["momentum"],
+        )
+
+    if config["schedule"]:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, len(trainloader) * config["epochs"], verbose=True
+        )
 
     print("Starting training...\n")
 
-    for epoch in range(EPOCHS):
+    wandb.watch(net)
+
+    for epoch in range(config["epochs"]):
+        start_time = time.time()
         pbar = tqdm(desc=f"Training epoch: {epoch}", total=len(trainloader))
         running_loss = 0.0
         correct = 0
         total = 0
 
+        net.train()
         for i, data in enumerate(trainloader, 0):
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
@@ -60,6 +95,8 @@ if __name__ == "__main__":
             loss = loss_fn(outputs, labels)
             loss.backward()
             optimizer.step()
+            if config["schedule"]:
+                scheduler.step()
 
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -76,6 +113,8 @@ if __name__ == "__main__":
         running_loss = 0.0
         correct = 0
         total = 0
+
+        net.eval()
         with torch.no_grad():
             for data in testloader:
                 images, labels = data
@@ -90,5 +129,21 @@ if __name__ == "__main__":
 
         test_loss = running_loss / len(testset)
         test_accuracy = 100 * correct / total
-        print(f"Accuracy on testset: {test_accuracy}")
+        print(f"Accuracy on testset: {test_accuracy}\n")
         pbar.close()
+
+        wandb.log(
+            {
+                "epoch": epoch,
+                "training_loss": train_loss,
+                "testing_loss": test_loss,
+                "training_acc": train_accuracy,
+                "testing_acc": test_accuracy,
+                "epoch_time": time.time() - start_time,
+            },
+        )
+
+        if (epoch + 1) % 5 == 0:
+            torch.save(
+                net.state_dict(), os.path.join(wandb.run.dir, f"SysDLNet_{epoch}.pt")
+            )
