@@ -149,9 +149,9 @@ if __name__ == "__main__":
     metric = {"name": "loss", "goal": "minimize"}
     sweep_config["metric"] = metric
     parameters_dict = {
-        "epochs": {"value": 5},
+        "epochs": {"value": 20},
         "optimizer": {"values": ["adam", "sgd"]},
-        "lr": {"values": [0.0001, 0.0003, 0.001, 0.003, 0.01]},
+        "lr": {"values": [0.0001, 0.0025, 0.0075, 0.001, 0.003]},
         "weight_decay": {"values": [0, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]},
         "batch_size": {"values": [64, 256, 512]},
         "momentum": {"values": [0, 0.1, 0.3, 0.6, 0.8, 0.9, 0.95]},
@@ -160,4 +160,4 @@ if __name__ == "__main__":
     sweep_config["parameters"] = parameters_dict
 
     sweep_id = wandb.sweep(sweep_config, project="SysDL Assignment 3")
-    wandb.agent(sweep_id, run, count=5)
+    wandb.agent(sweep_id, run, count=25)
