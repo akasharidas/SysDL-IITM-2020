@@ -44,9 +44,13 @@ if __name__ == "__main__":
     loss_fn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(net.parameters())
 
+    print("Starting training...\n")
+
     for epoch in range(EPOCHS):
+        pbar = tqdm(desc=f"Training epoch: {epoch}", total=len(trainloader))
         running_loss = 0.0
-        pbar = tqdm(desc=f"Epoch: {epoch}", total=len(trainloader))
+        correct = 0
+        total = 0
 
         for i, data in enumerate(trainloader, 0):
             inputs, labels = data
@@ -57,15 +61,19 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
-            # print statistics
-            running_loss += loss.item()
-            if i % 2000 == 1999:
-                print("[%d, %5d] loss: %.3f" % (epoch + 1, i + 1, running_loss / 2000))
-                running_loss = 0.0
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            running_loss += loss.item() * labels.shape[0]
             pbar.update()
+
+        train_loss = running_loss / len(trainset)
+        train_accuracy = 100 * correct / total
         pbar.close()
 
         pbar = tqdm(desc="Testing", total=len(testloader))
+        running_loss = 0.0
         correct = 0
         total = 0
         with torch.no_grad():
@@ -74,12 +82,13 @@ if __name__ == "__main__":
                 images, labels = images.to(device), labels.to(device)
                 outputs = net(images)
                 _, predicted = torch.max(outputs.data, 1)
+
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
+                running_loss += loss_fn(outputs, labels).item() * labels.shape[0]
                 pbar.update()
 
-        print(
-            "Accuracy of the network on the 10000 test images: %d %%"
-            % (100 * correct / total)
-        )
+        test_loss = running_loss / len(testset)
+        test_accuracy = 100 * correct / total
+        print(f"Accuracy on testset: {test_accuracy}")
         pbar.close()
