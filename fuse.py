@@ -8,21 +8,14 @@ import os
 
 from SysDLNet import Net
 
-if __name__ == "__main__":
-    wandb.login(key="df416cf0e6b9361efc64aa08d4715af979c8d070")
-    config = dict(
-        epochs=5,
-        batch_size=64,
-        optimizer="adam",
-        lr=0.001,
-        momentum=None,
-        weight_decay=0,
-        schedule=False,
-    )
 
-    wandb.init(config=config, project="SysDL Assignment 3")
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def run(config=None):
+    if config:
+        wandb.init(config=config, project="SysDL Assignment 3")
+    else:
+        wandb.init(project="SysDL Assignment 3")
+    config = wandb.config
+    device = "cuda"
 
     transform_train = transforms.Compose(
         [
@@ -72,7 +65,7 @@ if __name__ == "__main__":
 
     if config["schedule"]:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, len(trainloader) * config["epochs"], verbose=True
+            optimizer, len(trainloader) * config["epochs"]
         )
 
     print("Starting training...\n")
@@ -147,3 +140,24 @@ if __name__ == "__main__":
                 net.state_dict(),
                 os.path.join(wandb.run.dir, "SysDLNet_{}.pt".format(epoch)),
             )
+
+
+if __name__ == "__main__":
+    wandb.login(key="df416cf0e6b9361efc64aa08d4715af979c8d070")
+
+    sweep_config = {"method": "random"}
+    metric = {"name": "loss", "goal": "minimize"}
+    sweep_config["metric"] = metric
+    parameters_dict = {
+        "epochs": {"value": 5},
+        "optimizer": {"values": ["adam", "sgd"]},
+        "lr": {"values": [0.0001, 0.0003, 0.001, 0.003, 0.01]},
+        "weight_decay": {"values": [0, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]},
+        "batch_size": {"values": [64, 256, 512]},
+        "momentum": {"values": [0, 0.1, 0.3, 0.6, 0.8, 0.9, 0.95]},
+        "schedule": {"values": [True, False]},
+    }
+    sweep_config["parameters"] = parameters_dict
+
+    sweep_id = wandb.sweep(sweep_config, project="SysDL Assignment 3")
+    wandb.agent(sweep_id, run, count=5)
