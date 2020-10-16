@@ -80,9 +80,10 @@ if __name__ == "__main__":
     wandb.watch(net)
 
     for epoch in range(config["epochs"]):
+        wandb.log({"epoch": epoch}, commit=False)
+
         start_time = time.time()
         pbar = tqdm(desc=f"Training epoch: {epoch}", total=len(trainloader))
-        running_loss = 0.0
         correct = 0
         total = 0
 
@@ -102,10 +103,9 @@ if __name__ == "__main__":
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-            running_loss += loss.item() * labels.shape[0]
+            wandb.log({"train_loss": loss.item()})
             pbar.update()
 
-        train_loss = running_loss / len(trainset)
         train_accuracy = 100 * correct / total
         pbar.close()
 
@@ -134,11 +134,9 @@ if __name__ == "__main__":
 
         wandb.log(
             {
-                "epoch": epoch,
-                "training_loss": train_loss,
-                "testing_loss": test_loss,
-                "training_acc": train_accuracy,
-                "testing_acc": test_accuracy,
+                "train_acc": train_accuracy,
+                "test_loss": test_loss,
+                "test_acc": test_accuracy,
                 "epoch_time": time.time() - start_time,
             },
         )
