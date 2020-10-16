@@ -83,7 +83,7 @@ if __name__ == "__main__":
         wandb.log({"epoch": epoch}, commit=False)
 
         start_time = time.time()
-        pbar = tqdm(desc=f"Training epoch: {epoch}", total=len(trainloader))
+        pbar = tqdm(desc="Training epoch: {}".format(epoch), total=len(trainloader))
         correct = 0
         total = 0
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
         test_loss = running_loss / len(testset)
         test_accuracy = 100 * correct / total
-        print(f"Accuracy on testset: {test_accuracy}\n")
+        print("Accuracy on testset: {}\n".format(test_accuracy))
         pbar.close()
 
         wandb.log(
@@ -143,5 +143,6 @@ if __name__ == "__main__":
 
         if (epoch + 1) % 5 == 0:
             torch.save(
-                net.state_dict(), os.path.join(wandb.run.dir, f"SysDLNet_{epoch}.pt")
+                net.state_dict(),
+                os.path.join(wandb.run.dir, "SysDLNet_{}.pt".format(epoch)),
             )
