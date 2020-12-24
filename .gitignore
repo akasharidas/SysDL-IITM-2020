@@ -8,3 +8,5 @@ wandb
 *.gif
 *.txt
 *.jpeg
+
+!assignment3/report.pdf
