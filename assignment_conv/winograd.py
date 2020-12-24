@@ -5,31 +5,40 @@ Source: https://github.com/adam-dziedzic/winograd
 import torch
 
 
-class Winograd(object):
-    B = torch.tensor(
-        [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, -1.0, 1.0],
-            [-1.0, 1.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, -1.0],
-        ]
-    )
-    B_T = B.transpose(1, 0)
-    G = torch.tensor(
-        [[1.0, 0.0, 0.0], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.0, 0.0, 1.0]]
-    )
-    G_T = G.transpose(1, 0)
-    A = torch.tensor([[1.0, 0.0], [1.0, 1.0], [1.0, -1.0], [0.0, -1.0]])
-    A_T = A.transpose(1, 0)
-
+class Winograd_Conv2d(torch.nn.Module):
     def __init__(self, filter_value=None):
-        super(Winograd, self).__init__()
+        super(Winograd_Conv2d, self).__init__()
+
+        self.B = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, -1.0, 1.0],
+                [-1.0, 1.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, -1.0],
+            ]
+        )
+        self.B_T = self.B.transpose(1, 0)
+        self.G = torch.tensor(
+            [[1.0, 0.0, 0.0], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [0.0, 0.0, 1.0]]
+        )
+        self.G_T = self.G.transpose(1, 0)
+        self.A = torch.tensor([[1.0, 0.0], [1.0, 1.0], [1.0, -1.0], [0.0, -1.0]])
+        self.A_T = self.A.transpose(1, 0)
 
         if filter_value is not None:
             self.filter = filter_value
 
-    @staticmethod
-    def forward(input, filter):
+    def _apply(self, fn):
+        super()._apply(fn)
+        self.B = fn(self.B)
+        self.B_T = fn(self.B_T)
+        self.G = fn(self.G)
+        self.G_T = fn(self.G_T)
+        self.A = fn(self.A)
+        self.A_T = fn(self.A_T)
+        return self
+
+    def forward(self, input, filter):
         """
         Compute Winograd convolution.
         :param input:
@@ -53,14 +62,12 @@ class Winograd(object):
 
         T = (W - a) // overlap + 1  # tiles_per_channel
         P = N * T * T
-        U = torch.zeros(K, C, a, a)
-        V = torch.zeros(C, P, a, a)
+        U = torch.zeros(K, C, a, a, device=input.device)
+        V = torch.zeros(C, P, a, a, device=input.device)
 
         for k in range(K):
             for c in range(C):
-                U[k, c] = torch.matmul(
-                    Winograd.G, torch.matmul(filter[k, c], Winograd.G_T)
-                )
+                U[k, c] = torch.matmul(self.G, torch.matmul(filter[k, c], self.G_T))
 
         for n in range(N):
             for tH in range(T):
@@ -70,13 +77,11 @@ class Winograd(object):
                         vH = tH * (r - 1)
                         vW = tW * (r - 1)
                         V[c, b] = torch.matmul(
-                            Winograd.B_T,
-                            torch.matmul(
-                                input[c, n, vH : vH + a, vW : vW + a], Winograd.B
-                            ),
+                            self.B_T,
+                            torch.matmul(input[c, n, vH : vH + a, vW : vW + a], self.B),
                         )
 
-        M = torch.zeros(K, P, a, a)
+        M = torch.zeros(K, P, a, a, device=input.device)
         for k in range(K):
             for b in range(P):
                 for c in range(C):
@@ -92,12 +97,8 @@ class Winograd(object):
                         oH = tH * m
                         oW = tW * m
                         Y[k, n, oH : oH + m, oW : oW + m] = torch.matmul(
-                            Winograd.A_T, torch.matmul(M[k, b], Winograd.A)
+                            self.A_T, torch.matmul(M[k, b], self.A)
                         )
 
         Y = torch.transpose(Y, 0, 1)
         return Y
-
-
-def winograd_conv(_input, _filter):
-    return Winograd.forward(_input, _filter)
