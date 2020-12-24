@@ -9,32 +9,42 @@ from direct import Direct_Conv2d
 from im2col import Im2Col_Conv2d
 from winograd import Winograd_Conv2d
 from fft import FFT_Conv2d
+from decomp import Tucker_Conv2d
+from decomp import CP_Conv2d
 
 
-def run_and_time(name, conv2d, _input, _filter):
+def run_and_time(name, model, _input, _filter):
     times = []
     iters = 1 if name == "direct" else 1
 
     for _ in tqdm(range(iters), desc=f"Running benchmark for {name}"):
         start_time = time.time()
-        out = conv2d(_input, _filter)
+        out = model(_input, _filter)
         times.append(time.time() - start_time)
         del out
 
     return mean(times)
 
 
-def test_implementation(conv2d, _input, _filter):
+def test_implementation(name, model, _input, _filter):
     reference = torch.nn.functional.conv2d(_input, _filter)
-    return torch.allclose(reference, conv2d(_input, _filter))
+
+    """the tucker and cp models discard the original weights and initialize 
+    new weights for each decomposed block, therefore we only check the shape"""
+    if name in ["tucker", "cp"]:
+        return reference.shape == model(_input, _filter).shape
+
+    return torch.allclose(reference, model(_input, _filter))
 
 
 if __name__ == "__main__":
     convs = {
-        "direct": Direct_Conv2d(),
-        "im2col": Im2Col_Conv2d(),
-        "winograd": Winograd_Conv2d(),
-        "fft": FFT_Conv2d(),
+        "direct": Direct_Conv2d,
+        "im2col": Im2Col_Conv2d,
+        "winograd": Winograd_Conv2d,
+        "fft": FFT_Conv2d,
+        "tucker": Tucker_Conv2d,
+        "cp": CP_Conv2d,
     }
 
     devices = ["cpu", "cuda"]
@@ -48,16 +58,20 @@ if __name__ == "__main__":
 
         # check that the outputs match the reference PyTorch implementation
         print("Testing correctness of implementations...")
-        for _, conv2d in convs.items():
-            assert test_implementation(conv2d, test_i, test_f)
+        for name, conv2d in convs.items():
+            model = conv2d(C, M, R, S, test_f) if name in ["tucker", "cp"] else conv2d()
+            assert test_implementation(name, model, test_i, test_f)
         print("Tests passed.")
 
         for device in devices:
             print(f"Running benchmarks on {device}...")
             test_i, test_f = test_i.to(device), test_f.to(device)
             for name, conv2d in convs.items():
-                conv2d.to(device)
-                results[device][name] = run_and_time(name, conv2d, test_i, test_f)
+                model = (
+                    conv2d(C, M, R, S, test_f) if name in ["tucker", "cp"] else conv2d()
+                )
+                model.to(device)
+                results[device][name] = run_and_time(name, model, test_i, test_f)
 
-    with open("results.pkl", "w") as f:
+    with open("results.json", "w") as f:
         json.dump(dict(results), f, indent=4)
