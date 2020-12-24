@@ -145,19 +145,31 @@ def run(config=None):
 if __name__ == "__main__":
     wandb.login(key="df416cf0e6b9361efc64aa08d4715af979c8d070")
 
-    sweep_config = {"method": "random"}
-    metric = {"name": "loss", "goal": "minimize"}
-    sweep_config["metric"] = metric
-    parameters_dict = {
-        "epochs": {"value": 20},
-        "optimizer": {"values": ["adam", "sgd"]},
-        "lr": {"values": [0.0001, 0.0025, 0.0075, 0.001, 0.003]},
-        "weight_decay": {"values": [0, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]},
-        "batch_size": {"values": [64, 256, 512]},
-        "momentum": {"values": [0, 0.1, 0.3, 0.6, 0.8, 0.9, 0.95]},
-        "schedule": {"values": [True, False]},
-    }
-    sweep_config["parameters"] = parameters_dict
+    run(
+        {
+            "epochs": 150,
+            "optimizer": "adam",
+            "lr": 0.0025,
+            "weight_decay": 0.00001,
+            "batch_size": 512,
+            "momentum": 0.95,
+            "schedule": True,
+        }
+    )
 
-    sweep_id = wandb.sweep(sweep_config, project="SysDL Assignment 3")
-    wandb.agent(sweep_id, run, count=25)
+    # sweep_config = {"method": "random"}
+    # metric = {"name": "loss", "goal": "minimize"}
+    # sweep_config["metric"] = metric
+    # parameters_dict = {
+    #     "epochs": {"value": 20},
+    #     "optimizer": {"values": ["adam", "sgd"]},
+    #     "lr": {"values": [0.0001, 0.0025, 0.0075, 0.001, 0.003]},
+    #     "weight_decay": {"values": [0, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3]},
+    #     "batch_size": {"values": [64, 256, 512]},
+    #     "momentum": {"values": [0, 0.1, 0.3, 0.6, 0.8, 0.9, 0.95]},
+    #     "schedule": {"values": [True, False]},
+    # }
+    # sweep_config["parameters"] = parameters_dict
+
+    # sweep_id = wandb.sweep(sweep_config, project="SysDL Assignment 3")
+    # wandb.agent(sweep_id, run, count=25)

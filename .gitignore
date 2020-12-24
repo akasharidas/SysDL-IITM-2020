@@ -1,3 +1,10 @@
 data
 __pycache__
 wandb
+*.ipynb
+*.jpg
+*.pdf
+*.png
+*.gif
+*.txt
+*.jpeg
