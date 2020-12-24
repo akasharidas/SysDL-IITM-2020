@@ -8,5 +8,6 @@ wandb
 *.gif
 *.txt
 *.jpeg
+*.json
 
 !assignment3/report.pdf
