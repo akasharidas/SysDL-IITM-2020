@@ -3,7 +3,6 @@ import time
 from statistics import mean
 from collections import defaultdict
 from tqdm import tqdm
-import json
 import wandb
 
 from direct import Direct_Conv2d
@@ -12,11 +11,12 @@ from winograd import Winograd_Conv2d
 from fft import FFT_Conv2d
 from decomp import Tucker_Conv2d
 from decomp import CP_Conv2d
+from config import configs
 
 
 def run_and_time(name, model, _input, _filter):
     times = []
-    iters = 1 if name == "direct" else 5
+    iters = 1 if name == "direct" else 3 if name == "winograd" else 5
 
     for _ in tqdm(range(iters), desc=f"Running benchmark for {name}"):
         start_time = time.time()
@@ -40,10 +40,10 @@ def test_implementation(name, model, _input, _filter):
 
 def run(config, convs, devices, test=False):
     wandb.init(project="sysdl-assignment7")
+    print(f"\nCurrent config: {config}")
 
     results = defaultdict(dict)
-    N, C, H, W, M, R, S = (
-        config["N"],
+    C, H, W, M, R, S = (
         config["C"],
         config["H"],
         config["W"],
@@ -51,30 +51,31 @@ def run(config, convs, devices, test=False):
         config["R"],
         config["S"],
     )
-    test_i = torch.rand(N, C, H, W, dtype=torch.float)
-    test_f = torch.rand(M, C, R, S, dtype=torch.float)
 
     with torch.no_grad():
-
         if test:
             # check that the outputs match the reference PyTorch implementation
             print("Testing correctness of implementations...")
+            img = torch.rand(8, 3, 16, 16, dtype=torch.float)
+            fil = torch.rand(2, 3, 3, 3, dtype=torch.float)
             for name, conv2d in convs.items():
                 model = (
-                    conv2d(C, M, R, S, test_f) if name in ["tucker", "cp"] else conv2d()
+                    conv2d(C, M, R, S, fil) if name in ["tucker", "cp"] else conv2d()
                 )
-                assert test_implementation(name, model, test_i, test_f)
+                assert test_implementation(name, model, img, fil)
             print("Tests passed.")
 
         for device in devices:
-            print(f"Running benchmarks on {device}...")
-            test_i, test_f = test_i.to(device), test_f.to(device)
+            print(f"\nRunning benchmarks on {device}...")
+            N = 8 if device == "cpu" else 128
+            img = torch.rand(N, C, H, W, dtype=torch.float, device=device)
+            fil = torch.rand(M, C, R, S, dtype=torch.float, device=device)
             for name, conv2d in convs.items():
                 model = (
-                    conv2d(C, M, R, S, test_f) if name in ["tucker", "cp"] else conv2d()
+                    conv2d(C, M, R, S, fil) if name in ["tucker", "cp"] else conv2d()
                 )
                 model.to(device)
-                results[name][device] = run_and_time(name, model, test_i, test_f)
+                results[name][device] = run_and_time(name, model, img, fil)
 
     wandb.log({"results": dict(results), "config": config})
 
@@ -82,7 +83,7 @@ def run(config, convs, devices, test=False):
 if __name__ == "__main__":
     wandb.login(key="df416cf0e6b9361efc64aa08d4715af979c8d070")
 
-    convs = {
+    convolutions = {
         "im2col": Im2Col_Conv2d,
         "winograd": Winograd_Conv2d,
         "fft": FFT_Conv2d,
@@ -92,5 +93,16 @@ if __name__ == "__main__":
     }
     devices = ["cpu", "cuda"]
 
-    config = dict(N=8, C=3, H=32, W=32, M=2, R=3, S=3)
-    run(config, convs, devices)
+    for c, h, w, m, r, s in configs:
+        config = dict(C=c, H=h, W=w, M=m, R=r, S=s)
+
+        invalid = []
+        if not (config["R"] == 3 and config["S"] == 3):
+            invalid.append("winograd")
+        if not ((config["H"] == config["W"]) and (config["H"] % 2 == 0)):
+            invalid.append("winograd")
+        if config["H"] > 32 or config["W"] > 32 or config["C"] > 3:
+            invalid.append("direct")
+
+        convs = {k: v for k, v in convolutions.items() if k not in invalid}
+        run(config, convs, devices)
