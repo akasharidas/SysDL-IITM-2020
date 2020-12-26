@@ -39,7 +39,7 @@ def test_implementation(name, model, _input, _filter):
 
 
 def run(config, convs, devices, test=False):
-    wandb.init(project="sysdl-assignment7")
+    r = wandb.init(project="sysdl-assignment7")
     print(f"\nCurrent config: {config}")
 
     results = defaultdict(dict)
@@ -78,6 +78,7 @@ def run(config, convs, devices, test=False):
                 results[name][device] = run_and_time(name, model, img, fil)
 
     wandb.log({"results": dict(results), "config": config})
+    r.finish()
 
 
 if __name__ == "__main__":
@@ -100,6 +101,8 @@ if __name__ == "__main__":
         if not (config["R"] == 3 and config["S"] == 3):
             invalid.append("winograd")
         if not ((config["H"] == config["W"]) and (config["H"] % 2 == 0)):
+            invalid.append("winograd")
+        if config["H"] > 64:
             invalid.append("winograd")
         if config["H"] > 32 or config["W"] > 32 or config["C"] > 3:
             invalid.append("direct")
